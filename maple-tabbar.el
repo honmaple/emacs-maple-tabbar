@@ -45,21 +45,34 @@
   :type 'func
   :group 'maple-tabbar)
 
-(defface maple-tabbar-face `((t (:inherit header-line-highlight :height 0.9 :box nil :background ,(face-attribute 'default :background))))
-  "Tabbar face."
+(defface maple-tabbar-active `((t (:inherit header-line-highlight :height 0.9 :box nil :background ,(face-attribute 'default :background))))
+  "Tabbar active face."
   :group 'maple-tabbar)
+
+(defface maple-tabbar-inactive `((t (:inherit header-line :height 0.9 :box nil)))
+  "Tabbar inactive face."
+  :group 'maple-tabbar)
+
+(defvar maple-tabbar-active-buffer nil)
 
 (defun maple-tabbar-refresh()
   "Refresh buffer list."
   (interactive)
   (setq header-line-format (maple-tabbar--init)))
 
+(defun maple-tabbar-face(&optional buffer)
+  "Get face when active or not with BUFFER."
+  (if (eq (buffer-name buffer) maple-tabbar-active-buffer)
+      'maple-tabbar-active
+    'maple-tabbar-inactive))
+
 (defun maple-tabbar-display(index buffer)
   "Display with INDEX and BUFFER."
   (concat
+   (funcall maple-tabbar-sep 'header-line (maple-tabbar-face buffer) t)
    (propertize
     (concat index "." (buffer-name buffer))
-    'face 'maple-tabbar-face
+    'face (maple-tabbar-face buffer)
     'pointer 'hand
     'help-echo "select buffer"
     'local-map (maple-tabbar-keymap
@@ -67,12 +80,13 @@
                 `(lambda (event) (interactive "e") (switch-to-buffer ,buffer))))
    (propertize
     " ×"
-    'face 'maple-tabbar-face
+    'face (maple-tabbar-face buffer)
     'help-echo "kill this buffer"
     'pointer 'hand
     'local-map (maple-tabbar-keymap
                 'mouse-1
-                `(lambda (event) (interactive "e") (kill-buffer ,buffer))))))
+                `(lambda (event) (interactive "e") (kill-buffer ,buffer))))
+   (funcall maple-tabbar-sep (maple-tabbar-face buffer) 'header-line)))
 
 (defun maple-tabbar-buffer()
   "Get buffer list."
@@ -86,10 +100,11 @@
 
 (defun maple-tabbar-ignore-p(buffer)
   "Ignore BUFFER name."
-  (catch 'ignored
-    (dolist (regex maple-tabbar-ignore)
-      (when (string-match regex (buffer-name buffer))
-        (throw 'ignored t)))))
+  (or (window-minibuffer-p)
+      (catch 'ignored
+        (dolist (regex maple-tabbar-ignore)
+          (when (string-match regex (buffer-name buffer))
+            (throw 'ignored t))))))
 
 (defun maple-tabbar-keymap(mouse function)
   "Make keymap with MOUSE and FUNCTION."
@@ -99,16 +114,18 @@
 
 (defun maple-tabbar--init()
   "Init."
-  (reduce (lambda(a b)
-            (concat a
-                    (funcall maple-tabbar-sep 'header-line 'maple-tabbar-face t)
-                    b
-                    (funcall maple-tabbar-sep 'maple-tabbar-face 'header-line)))
-          (maple-tabbar-buffer) :initial-value ""))
+  (mapcar 'concat (maple-tabbar-buffer)))
+
+(defun maple-tabbar-update()
+  "Hook when buffer change."
+  (unless (maple-tabbar-ignore-p (current-buffer))
+    (setq maple-tabbar-active-buffer (buffer-name))))
 
 (defun maple-tabbar-init()
   "Make keymap with MOUSE and FUNCTION."
+  (maple-tabbar-update)
   (set-face-attribute 'header-line nil :box nil)
+  (add-hook 'window-configuration-change-hook 'maple-tabbar-update)
   (setq-default header-line-format `("%e" (:eval (maple-tabbar--init)))))
 
 ;;;###autoload
@@ -117,7 +134,8 @@
   :group      'maple-tabbar
   :global     t
   (if maple-tabbar-mode (maple-tabbar-init)
-    (setq-default header-line-format nil)))
+    (setq-default header-line-format nil)
+    (remove-hook 'window-configuration-change-hook 'maple-tabbar-update)))
 
 (provide 'maple-tabbar)
 ;;; maple-tabbar.el ends here
