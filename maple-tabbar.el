@@ -91,7 +91,7 @@
 (defun maple-tabbar-buffer()
   "Get buffer list."
   (let* ((index 0)
-         (buffers (cl-loop for buffer in (reverse (buffer-list)) collect
+         (buffers (cl-loop for buffer in (buffer-list) collect
                            (unless (maple-tabbar-ignore-p buffer)
                              (setq index (+ index 1))
                              (maple-tabbar-display (int-to-string index) buffer))))
