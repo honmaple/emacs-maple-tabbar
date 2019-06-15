@@ -2,6 +2,7 @@
 ** screenshots
    [[https://github.com/honmaple/emacs-maple-tabbar/blob/master/screenshot/example.png]]
    [[https://github.com/honmaple/emacs-maple-tabbar/blob/master/screenshot/example1.png]]
+   [[https://github.com/honmaple/emacs-maple-tabbar/blob/master/screenshot/example2.png]]
 
 ** How to use
    #+begin_src bash
@@ -24,4 +25,9 @@
                       :foreground (face-attribute (if reverse face2 face1) :background))))
 
        (setq maple-tabbar-sep 'custom-tabbar-sep))
+
+     ;; or with single show
+     (use-package maple-tabbar-side
+       :ensure nil
+       :commands (maple-tabbar-side-mode))
    #+end_src
