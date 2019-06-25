@@ -40,6 +40,11 @@
   :type 'number
   :group 'maple-tabbar)
 
+(defcustom maple-tabbar-icon (display-graphic-p)
+  "Whether show icon."
+  :type 'boolean
+  :group 'maple-tabbar)
+
 (defcustom maple-tabbar-sep 'maple-xpm-draw
   "Buffer separator."
   :type 'func
@@ -55,20 +60,21 @@
   :type 'func
   :group 'maple-tabbar)
 
-(defface maple-tabbar-active `((t (:inherit header-line-highlight :height 0.9 :box nil :background ,(face-attribute 'default :background))))
+(defface maple-tabbar-active `((t (:inherit header-line-highlight :height 0.95 :box nil :background ,(face-attribute 'default :background))))
   "Tabbar active face."
   :group 'maple-tabbar)
 
-(defface maple-tabbar-inactive `((t (:inherit header-line :height 0.9 :box nil)))
+(defface maple-tabbar-inactive `((t (:inherit header-line :height 0.95 :box nil)))
   "Tabbar inactive face."
   :group 'maple-tabbar)
 
 (defvar maple-tabbar-active-buffer nil)
+(defvar maple-tabbar-buffer-list nil)
 
-(defun maple-tabbar-face(&optional buffer)
-  "Get face when active or not with BUFFER."
+(defun maple-tabbar-face(&optional buffer reverse)
+  "Get face when active or not with BUFFER and REVERSE."
   (with-current-buffer maple-tabbar-active-buffer
-    (if (eq (buffer-name buffer) (buffer-name))
+    (if (and (eq (buffer-name buffer) (buffer-name)) (not reverse))
         'maple-tabbar-active
       'maple-tabbar-inactive)))
 
@@ -90,31 +96,59 @@
     (pop-to-buffer maple-tabbar-active-buffer))
   (kill-buffer buffer))
 
+(defun maple-tabbar-icon-for-mode (mode &optional face-overrides)
+  "Apply `all-the-icons-for-mode' on MODE with FACE-OVERRIDES but either return an icon or nil."
+  (let* ((icon (cdr (or (assoc mode all-the-icons-mode-icon-alist)
+                        (assoc (get mode 'derived-mode-parent) all-the-icons-mode-icon-alist))))
+         (args (cdr icon))
+         (arg-overrides '(:height 0.9 :v-adjust -0.1))
+         (face (plist-get (cdr args) :face))
+         (face-overrides (when face-overrides `(:background ,(face-attribute face-overrides :background nil t)))))
+    (when face
+      (setq face-overrides (append `(:inherit ,face) face-overrides)))
+    (when face-overrides
+      (setq arg-overrides (append arg-overrides (list :face face-overrides))))
+    (setq args (append `(,(car args)) arg-overrides (cdr args)))
+    (let ((icon (if icon (apply (car icon) args) mode)))
+      (unless (symbolp icon) icon))))
+
+(defun maple-tabbar-concat(index buffer &optional face)
+  "Display `INDEX` `BUFFER` `FACE` icon with all-the-icons."
+  (if (and maple-tabbar-icon (featurep 'all-the-icons))
+      (format "%s %s.%s"
+              (propertize "\t" 'display
+                          (or (maple-tabbar-icon-for-mode (buffer-local-value 'major-mode buffer) face)
+                              (maple-tabbar-icon-for-mode 'text-mode face)))
+              index (buffer-name buffer))
+    (concat index "." (buffer-name buffer))))
+
 (defun maple-tabbar-display(index buffer)
   "Display with INDEX and BUFFER."
-  (concat
-   (funcall maple-tabbar-sep 'header-line (maple-tabbar-face buffer) t)
-   (propertize
-    (concat index "." (buffer-name buffer))
-    'face (maple-tabbar-face buffer)
-    'pointer 'hand
-    'help-echo "select this buffer"
-    'keymap (maple-tabbar-keymap
-             `(lambda (event) (interactive "e") (funcall maple-tabbar-select ,buffer))))
-   (propertize
-    " ×"
-    'face (maple-tabbar-face buffer)
-    'help-echo "kill this buffer"
-    'pointer 'hand
-    'keymap (maple-tabbar-keymap
-             `(lambda (event) (interactive "e") (funcall maple-tabbar-kill ,buffer))))
-   (funcall maple-tabbar-sep (maple-tabbar-face buffer) 'header-line)))
+  (let ((face (maple-tabbar-face buffer))
+        (face1 (maple-tabbar-face buffer t)))
+    (concat
+     (funcall maple-tabbar-sep face1 face t)
+     (propertize
+      (maple-tabbar-concat index buffer face)
+      'face face
+      'pointer 'hand
+      'help-echo "select this buffer"
+      'keymap (maple-tabbar-keymap
+               `(lambda (event) (interactive "e") (funcall maple-tabbar-select ,buffer))))
+     (propertize
+      " ×"
+      'face (maple-tabbar-face buffer)
+      'help-echo "kill this buffer"
+      'pointer 'hand
+      'keymap (maple-tabbar-keymap
+               `(lambda (event) (interactive "e") (funcall maple-tabbar-kill ,buffer))))
+     (funcall maple-tabbar-sep face face1))))
 
 (defun maple-tabbar-buffer()
   "Get buffer list."
   (let* ((index 0)
-         (buffers (cl-loop for buffer in (buffer-list) collect
-                           (unless (maple-tabbar-ignore-p buffer)
+         (buffers (cl-loop for buffer in maple-tabbar-buffer-list collect
+                           (when (buffer-live-p buffer)
                              (setq index (+ index 1))
                              (maple-tabbar-display (int-to-string index) buffer))))
          (buffers (remove nil buffers)))
@@ -139,10 +173,14 @@
 (defun maple-tabbar-update()
   "Hook when buffer change."
   (unless (maple-tabbar-ignore-p (current-buffer))
-    (setq maple-tabbar-active-buffer (current-buffer))))
+    (setq maple-tabbar-active-buffer (current-buffer)))
+  (unless (memq maple-tabbar-active-buffer maple-tabbar-buffer-list)
+    (add-to-list 'maple-tabbar-buffer-list maple-tabbar-active-buffer t))
+  (setq maple-tabbar-buffer-list (remove-if-not 'buffer-live-p maple-tabbar-buffer-list)))
 
 (defun maple-tabbar-mode-on()
   "Show maple tabbar."
+  (setq maple-tabbar-buffer-list (remove-if 'maple-tabbar-ignore-p (buffer-list)))
   (maple-tabbar-update)
   (set-face-attribute 'header-line nil :box nil)
   (add-hook 'window-configuration-change-hook 'maple-tabbar-update)

@@ -83,7 +83,7 @@
 
       (setq maple-tabbar-side-face-remap
             (face-remap-add-relative
-             'default (list :background (face-attribute 'header-line :background))))
+             'default (list :background (face-attribute 'maple-tabbar-inactive :background nil t))))
       (setq window-size-fixed 'height))))
 
 (defun maple-tabbar-side-display-buffer (buffer _alist)
@@ -121,6 +121,7 @@
 
 (defun maple-tabbar-side-mode-on ()
   "Show maple tabbar."
+  (setq maple-tabbar-buffer-list (remove-if 'maple-tabbar-ignore-p (buffer-list)))
   (maple-tabbar-side-with-buffer
     (maple-tabbar-side-buffer-configure)
     (maple-tabbar-side-refresh)
