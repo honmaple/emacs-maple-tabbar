@@ -99,7 +99,7 @@
   (save-excursion
     (read-only-mode -1)
     (erase-buffer)
-    (insert (format-mode-line (mapcar 'concat (maple-tabbar-buffer))))
+    (insert (format-mode-line (maple-tabbar-init)))
     (read-only-mode 1)))
 
 (defun maple-tabbar-side-update ()
@@ -121,7 +121,9 @@
 
 (defun maple-tabbar-side-mode-on ()
   "Show maple tabbar."
-  (setq maple-tabbar-buffer-list (remove-if 'maple-tabbar-ignore-p (buffer-list)))
+  (setq maple-tabbar-buffer-list '())
+  (dolist (buffer (buffer-list))
+    (unless (maple-tabbar-ignore-p buffer) (maple-tabbar-group-buffer buffer)))
   (maple-tabbar-side-with-buffer
     (maple-tabbar-side-buffer-configure)
     (maple-tabbar-side-refresh)

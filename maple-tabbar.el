@@ -25,6 +25,7 @@
 
 ;;; Code:
 (require 'maple-xpm)
+(require 'maple-tabbar-group)
 
 (defgroup maple-tabbar nil
   "Display tabbar in header line."
@@ -35,9 +36,9 @@
   :type 'list
   :group 'maple-tabbar)
 
-(defcustom maple-tabbar-number 10
-  "Max show number."
-  :type 'number
+(defcustom maple-tabbar-adjust t
+  "Whether make width auto ajust."
+  :type 'boolean
   :group 'maple-tabbar)
 
 (defcustom maple-tabbar-icon (display-graphic-p)
@@ -47,20 +48,20 @@
 
 (defcustom maple-tabbar-sep 'maple-xpm-draw
   "Buffer separator."
-  :type 'func
+  :type 'function
   :group 'maple-tabbar)
 
 (defcustom maple-tabbar-select 'maple-tabbar-default-select
   "Tabbar select buffer func."
-  :type 'func
+  :type 'function
   :group 'maple-tabbar)
 
 (defcustom maple-tabbar-kill 'maple-tabbar-default-kill
   "Tabbar kill buffer func."
-  :type 'func
+  :type 'function
   :group 'maple-tabbar)
 
-(defface maple-tabbar-active `((t (:inherit header-line-highlight :height 0.95 :box nil :background ,(face-attribute 'default :background))))
+(defface maple-tabbar-active `((t (:inherit header-line-highlight :box nil :background ,(face-attribute 'default :background))))
   "Tabbar active face."
   :group 'maple-tabbar)
 
@@ -125,34 +126,36 @@
 (defun maple-tabbar-display(index buffer)
   "Display with INDEX and BUFFER."
   (let ((face (maple-tabbar-face buffer))
-        (face1 (maple-tabbar-face buffer t)))
+        (face1 (maple-tabbar-face buffer t))
+        (name (buffer-name buffer)))
     (concat
      (funcall maple-tabbar-sep face1 face t)
      (propertize
       (maple-tabbar-concat index buffer face)
       'face face
       'pointer 'hand
-      'help-echo "select this buffer"
+      'help-echo name
       'keymap (maple-tabbar-keymap
                `(lambda (event) (interactive "e") (funcall maple-tabbar-select ,buffer))))
      (propertize
       " ×"
-      'face (maple-tabbar-face buffer)
-      'help-echo "kill this buffer"
+      'face face
+      'help-echo (format "kill %s" name)
       'pointer 'hand
       'keymap (maple-tabbar-keymap
                `(lambda (event) (interactive "e") (funcall maple-tabbar-kill ,buffer))))
      (funcall maple-tabbar-sep face face1))))
 
-(defun maple-tabbar-buffer()
+(defun maple-tabbar-buffers()
   "Get buffer list."
   (let* ((index 0)
-         (buffers (cl-loop for buffer in maple-tabbar-buffer-list collect
+         (group (maple-tabbar-current-group maple-tabbar-active-buffer))
+         (buffers (maple-tabbar-group-buffers group))
+         (buffers (cl-loop for buffer in buffers collect
                            (when (buffer-live-p buffer)
                              (setq index (+ index 1))
-                             (maple-tabbar-display (int-to-string index) buffer))))
-         (buffers (remove nil buffers)))
-    (cl-subseq buffers 0 (min maple-tabbar-number (length buffers)))))
+                             (maple-tabbar-display (int-to-string index) buffer)))))
+    (remove nil buffers)))
 
 (defun maple-tabbar-ignore-p(buffer)
   "Ignore BUFFER name."
@@ -164,7 +167,16 @@
 
 (defun maple-tabbar-init()
   "Init."
-  (mapcar 'concat (maple-tabbar-buffer)))
+  (let* ((buffers (maple-tabbar-buffers))
+         (p (string-join buffers))
+         (width (+ (window-width)
+                   (or (cdr (window-margins)) 0)
+                   (or (car (window-margins)) 0))))
+    (when maple-tabbar-adjust
+      (while (> (string-width p) width)
+        (setq buffers (butlast buffers))
+        (setq p (string-join buffers))))
+    p))
 
 (defun maple-tabbar-refresh()
   "Refresh buffer list."
@@ -174,13 +186,15 @@
   "Hook when buffer change."
   (unless (maple-tabbar-ignore-p (current-buffer))
     (setq maple-tabbar-active-buffer (current-buffer)))
-  (unless (memq maple-tabbar-active-buffer maple-tabbar-buffer-list)
-    (add-to-list 'maple-tabbar-buffer-list maple-tabbar-active-buffer t))
-  (setq maple-tabbar-buffer-list (remove-if-not 'buffer-live-p maple-tabbar-buffer-list)))
+  (maple-tabbar-group-buffer maple-tabbar-active-buffer)
+  (setq maple-tabbar-buffer-list
+        (remove-if-not (lambda(x) (buffer-live-p (car x))) maple-tabbar-buffer-list)))
 
 (defun maple-tabbar-mode-on()
   "Show maple tabbar."
-  (setq maple-tabbar-buffer-list (remove-if 'maple-tabbar-ignore-p (buffer-list)))
+  (setq maple-tabbar-buffer-list '())
+  (dolist (buffer (buffer-list))
+    (unless (maple-tabbar-ignore-p buffer) (maple-tabbar-group-buffer buffer)))
   (maple-tabbar-update)
   (set-face-attribute 'header-line nil :box nil)
   (add-hook 'window-configuration-change-hook 'maple-tabbar-update)

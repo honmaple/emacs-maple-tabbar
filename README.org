@@ -12,24 +12,31 @@
    #+end_src
 
    #+begin_src elisp
-          (use-package maple-tabbar
-            :ensure nil
-            :commands (maple-tabbar-mode)
-            :config
-            (setq maple-tabbar-ignore '("^.*\\*" "^magit")
-                  maple-tabbar-number 10
-                  maple-tabbar-icon (display-graphic-p))
+     (use-package maple-tabbar
+       :ensure nil
+       :commands (maple-tabbar-mode)
+       :config
+       (setq maple-tabbar-ignore '("^.*\\*" "^magit")
+             maple-tabbar-adjust t
+             maple-tabbar-icon (display-graphic-p))
 
-            (defun custom-tabbar-sep(face1 face2 &optional reverse)
-              (propertize
-               (char-to-string (if reverse #xe0b2 #xe0b0))
-               'face (list :background (face-attribute (if reverse face1 face2) :background)
-                           :foreground (face-attribute (if reverse face2 face1) :background))))
+       (defun custom-tabbar-sep(face1 face2 &optional reverse)
+         (propertize
+          (char-to-string (if reverse #xe0b2 #xe0b0))
+          'face (list :background (face-attribute (if reverse face1 face2) :background)
+                      :foreground (face-attribute (if reverse face2 face1) :background))))
 
-            (setq maple-tabbar-sep 'custom-tabbar-sep))
+       (setq maple-tabbar-sep 'custom-tabbar-sep)
 
-          ;; or with single tabbar show
-          (use-package maple-tabbar-side
-            :ensure nil
-            :commands (maple-tabbar-side-mode))
+       (defun custom-tabbar-group(buffer)
+         (with-current-buffer buffer
+           (cond ((and (featurep 'projectile) (projectile-project-p))
+                  (projectile-project-name))
+                 (t "Default"))))
+       (fset 'maple-tabbar-group 'custom-tabbar-group)
+
+       ;; or with single tabbar show
+       (use-package maple-tabbar-side
+         :ensure nil
+         :commands (maple-tabbar-side-mode))
    #+end_src
