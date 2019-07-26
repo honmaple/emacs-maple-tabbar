@@ -32,7 +32,7 @@
   (with-current-buffer buffer
     (cond ((and (featurep 'projectile) (projectile-project-p))
            (projectile-project-name))
-          (t "Default"))))
+          (t "default"))))
 
 (defun maple-tabbar-group-buffer(buffer)
   "Add BUFFER to group."

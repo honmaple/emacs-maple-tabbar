@@ -36,9 +36,10 @@
   :type 'list
   :group 'maple-tabbar)
 
-(defcustom maple-tabbar-adjust t
+(defcustom maple-tabbar-adjust 'width
   "Whether make width auto ajust."
-  :type 'boolean
+  :type '(choice (const string)
+                 (const width))
   :group 'maple-tabbar)
 
 (defcustom maple-tabbar-icon (display-graphic-p)
@@ -47,6 +48,11 @@
   :group 'maple-tabbar)
 
 (defcustom maple-tabbar-sep 'maple-xpm-draw
+  "Buffer separator."
+  :type 'function
+  :group 'maple-tabbar)
+
+(defcustom maple-tabbar-button " ×"
   "Buffer separator."
   :type 'function
   :group 'maple-tabbar)
@@ -71,13 +77,13 @@
 
 (defvar maple-tabbar-active-buffer nil)
 (defvar maple-tabbar-buffer-list nil)
+(defvar maple-tabbar-truncate nil)
 
 (defun maple-tabbar-face(&optional buffer reverse)
   "Get face when active or not with BUFFER and REVERSE."
-  (with-current-buffer maple-tabbar-active-buffer
-    (if (and (eq (buffer-name buffer) (buffer-name)) (not reverse))
-        'maple-tabbar-active
-      'maple-tabbar-inactive)))
+  (if (and (eq maple-tabbar-active-buffer buffer) (not reverse))
+      'maple-tabbar-active
+    'maple-tabbar-inactive))
 
 (defun maple-tabbar-keymap(action)
   "Make keymap with ACTION."
@@ -131,14 +137,16 @@
     (concat
      (funcall maple-tabbar-sep face1 face t)
      (propertize
-      (maple-tabbar-concat index buffer face)
+      (if (and maple-tabbar-truncate (not (eq maple-tabbar-active-buffer buffer)))
+          (truncate-string-to-width (maple-tabbar-concat index buffer face) maple-tabbar-truncate)
+        (maple-tabbar-concat index buffer face))
       'face face
       'pointer 'hand
       'help-echo name
       'keymap (maple-tabbar-keymap
                `(lambda (event) (interactive "e") (funcall maple-tabbar-select ,buffer))))
      (propertize
-      " ×"
+      maple-tabbar-button
       'face face
       'help-echo (format "kill %s" name)
       'pointer 'hand
@@ -172,10 +180,15 @@
          (width (+ (window-width)
                    (or (cdr (window-margins)) 0)
                    (or (car (window-margins)) 0))))
-    (when maple-tabbar-adjust
-      (while (> (string-width p) width)
-        (setq buffers (butlast buffers))
-        (setq p (string-join buffers))))
+    (cond ((eq maple-tabbar-adjust 'string)
+           (when (> (string-width p) width)
+             (setq maple-tabbar-truncate (/ width (+ (length buffers) 1)))
+             (setq p (string-join (maple-tabbar-buffers))))
+           (setq maple-tabbar-truncate nil))
+          ((eq maple-tabbar-adjust 'width)
+           (while (> (string-width p) width)
+             (setq buffers (butlast buffers))
+             (setq p (string-join buffers)))))
     p))
 
 (defun maple-tabbar-refresh()
