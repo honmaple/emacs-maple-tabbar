@@ -201,7 +201,7 @@
     (setq maple-tabbar-active-buffer (current-buffer)))
   (maple-tabbar-group-buffer maple-tabbar-active-buffer)
   (setq maple-tabbar-buffer-list
-        (remove-if-not (lambda(x) (buffer-live-p (car x))) maple-tabbar-buffer-list)))
+        (cl-loop for x in maple-tabbar-buffer-list when (buffer-live-p (car x)) collect x)))
 
 (defun maple-tabbar-mode-on()
   "Show maple tabbar."
